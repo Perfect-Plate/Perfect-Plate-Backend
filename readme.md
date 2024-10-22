@@ -66,6 +66,26 @@ Before you begin, ensure you have the following installed:
    pip install -r requirements.txt
    ```
 
+# Project Structure
+
+## app/
+- **__init__.py**
+- **main.py**
+- **config.py**
+- **models/**
+  - **food.py**
+- **services/**
+  - **openai_service.py**
+- **routers/**
+  - **food_swap.py**
+
+- **.env**
+- **requirements.txt**
+- **README.md**
+
+
+
+
 ## Adding Files
 
 1. Create a new branch for your feature or bug fix:
