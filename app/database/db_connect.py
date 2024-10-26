@@ -4,6 +4,8 @@ from fastapi import FastAPI, Depends
 from dotenv import load_dotenv
 import asyncpg
 
+from app.models.dietarypreferences import DietaryPreferences
+
 # Load environment variables from .env file
 load_dotenv()
 
