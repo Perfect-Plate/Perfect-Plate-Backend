@@ -1,25 +1,11 @@
 from fastapi import FastAPI, HTTPException, Depends
 from sqlalchemy.orm import Session
-from .services.services import UserService, PreferenceService, MealPlanService
-from .models.models import UserCreate, UserPreferenceCreate, MealPlanCreate
+from ..services.services import UserService, PreferenceService, MealPlanService
+from ..models.models import UserCreate, UserPreferenceCreate, MealPlanCreate
 from app.database.db_connect import get_db  # Import the get_db function
 from typing import List
 
 app = FastAPI(title="PerfectPlates API")
-
-# app = FastAPI(title="PerfectPlates API")
-
-# app.add_api_route(router)
-
-
-@app.get("/")
-async def root():
-    return {"message": "Project start"}
-
-
-@app.get("/hello/{name}")
-async def say_hello(name: str):
-    return {"message": f"Hello {name}"}
 
 
 @app.post("/users/", response_model=dict)
