@@ -10,12 +10,12 @@ class Allergies:
     allergy5: str
 
 
-# Testing Allergies
-allergiesEX = Allergies(
-    allergy1="Peanuts",
-    allergy2="Fish",
-    allergy3="Lactose",
-    allergy4="Bison",
-    allergy5="Green Onions",
-)
-print(allergiesEX)
+# # Testing Allergies
+# allergiesEX = Allergies(
+#     allergy1="Peanuts",
+#     allergy2="Fish",
+#     allergy3="Lactose",
+#     allergy4="Bison",
+#     allergy5="Green Onions",
+# )
+# print(allergiesEX)

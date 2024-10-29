@@ -11,13 +11,13 @@ class Nutrition:
     LowCalorie: bool
 
 
-# Testing
-nutritionEX = Nutrition(
-    None_Necessary=False,
-    LowCarb=True,
-    HighProtein=False,
-    LowFat=True,
-    LowSodium=False,
-    LowCalorie=True
-)
-print(nutritionEX)
+# # Testing
+# nutritionEX = Nutrition(
+#     None_Necessary=False,
+#     LowCarb=True,
+#     HighProtein=False,
+#     LowFat=True,
+#     LowSodium=False,
+#     LowCalorie=True
+# )
+# print(nutritionEX)
