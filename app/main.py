@@ -1,67 +1,41 @@
-from fastapi import FastAPI, HTTPException, Depends
-from sqlalchemy.orm import Session
-from .services.services import UserService, PreferenceService, MealPlanService
-from .models.models import UserCreate, UserPreferenceCreate, MealPlanCreate
-from app.database.db_connect import get_db  # Import the get_db function
-from typing import List
+import uvicorn
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="PerfectPlates API")
-
-# app = FastAPI(title="PerfectPlates API")
-
-# app.add_api_route(router)
+from app.routers.routes import api_router
+from app.utils.core.settings import settings
+from app.utils.core.events import lifespan
 
 
-@app.get("/")
-async def root():
-    return {"message": "Project start"}
+def create_app() -> FastAPI:
+    # init FastAPI with lifespan
+    app = FastAPI(
+        lifespan=lifespan,
+        title=settings.PROJECT_NAME,
+        openapi_url=f"{settings.API_V1_STR}/openapi.json",
+        generate_unique_id_function=lambda router: f"{router.tags[0]}-{router.name}",
+    )
+    # set CORS
+    # Set all CORS enabled origins
+    if settings.BACKEND_CORS_ORIGINS:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+    # Include the routers
+    app.include_router(api_router, prefix=settings.API_V1_STR)
+
+    return app
 
 
-@app.get("/hello/{name}")
-async def say_hello(name: str):
-    return {"message": f"Hello {name}"}
+app = create_app()
 
 
-@app.post("/users/", response_model=dict)
-def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    return UserService.create_user(db, user)
-
-
-@app.post("/users/{user_id}/preferences/", response_model=dict)
-def create_user_preferences(
-        user_id: int,
-        preferences: UserPreferenceCreate,
-        db: Session = Depends(get_db)
-):
-    user = UserService.get_user(db, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return PreferenceService.create_preference(db, user_id, preferences)
-
-
-@app.get("/users/{user_id}/preferences/", response_model=dict)
-def get_user_preferences(user_id: int, db: Session = Depends(get_db)):
-    preferences = PreferenceService.get_preferences(db, user_id)
-    if not preferences:
-        raise HTTPException(status_code=404, detail="Preferences not found")
-    return preferences
-
-
-@app.post("/users/{user_id}/meal-plans/", response_model=dict)
-def create_meal_plan(
-        user_id: int,
-        meal_plan: MealPlanCreate,
-        db: Session = Depends(get_db)
-):
-    user = UserService.get_user(db, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return MealPlanService.create_meal_plan(db, user_id, meal_plan)
-
-
-@app.get("/users/{user_id}/meal-plans/", response_model=List[dict])
-def get_user_meal_plans(user_id: int, db: Session = Depends(get_db)):
-    user = UserService.get_user(db, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return MealPlanService.get_user_meal_plans(db, user_id)
+if __name__ == "__main__":
+    host = "localhost"
+    port = 5000
+    uvicorn.run(app, host=host, port=port)
