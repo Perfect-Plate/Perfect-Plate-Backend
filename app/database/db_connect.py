@@ -12,6 +12,8 @@ from supabase.lib.client_options import ClientOptions
 
 from app.schemas.auth import UserIn
 
+from app.models.dietarypreferences import DietaryPreferences
+
 # Load environment variables from .env file
 load_dotenv()
 
