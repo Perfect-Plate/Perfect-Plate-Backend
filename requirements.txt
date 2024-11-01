@@ -7,4 +7,4 @@ pydantic~=2.9.2
 python-dotenv~=1.0.1
 gotrue~=2.9.3
 supabase~=2.9.1
-MyApplication~=0.1.0
+python-decouple~=3.8

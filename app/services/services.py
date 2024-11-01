@@ -1,21 +1,29 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.testing.pickleable import User
+from fastapi import HTTPException
 
+from app.database.db_connect import client
 from app.models.models import UserCreate, UserPreferenceCreate, MealPlanCreate
 
 
 class UserService:
     @staticmethod
-    async def create_user(db: Session, user: UserCreate):
-        db_user = User(uid=user.uid, email=user.email)
-        db.add(db_user)
-        db.commit()
-        db.refresh(db_user)
-        return db_user
+    async def create_user(user: UserCreate) -> User:
+        print(user)
+        # Use Supabase client to insert a new user
+        response = client.table("users").insert({"uid": user.uid, "email": user.email}).execute()  # Await the call
+        print(response)
+        if response:
+            raise HTTPException(status_code=500, detail="Failed to create user")
+        return response  # Return the created user data
 
     @staticmethod
-    def get_user(db: Session, user_id: int):
-        return db.query(User).filter(User.id == user_id).first()
+    async def get_user(user_id: int):  # Make this method async
+        response = await client.table("users").select("*").filter("id", "eq", user_id).execute()  # Await the call
+        if response.status_code != 200 or not response.data:
+            return None  # Or raise an HTTPException if preferred
+        return response.data[0]  # Return the first matching user
+
 
 
 class UserPreferenceService:
@@ -29,8 +37,8 @@ class UserPreferenceService:
         return db_preferences
 
     @staticmethod
-    def get_preferences(db: Session, user_id: int):
-        return db.query(UserPreferenceService).filter(UserPreferenceService.user_id == user_id).first()
+    def get_preferences(user_id: int):
+        return client.table.query(UserPreferenceService).filter(UserPreferenceService.user_id == user_id).first()
 
 
 class MealPlanService:
