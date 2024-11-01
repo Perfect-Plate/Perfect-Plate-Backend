@@ -1,17 +1,5 @@
-import os
-from fastapi import FastAPI
-from dotenv import load_dotenv
-import asyncpg
 from typing import List
 from dataclasses import dataclass
-
-# Load environment variables from .env file
-load_dotenv()
-
-app = FastAPI()
-
-DATABASE_URL = os.getenv("DATABASE_URL")
-recipe_detail = []
 
 @dataclass
 class RecipeDetails:
@@ -19,29 +7,6 @@ class RecipeDetails:
     Ingredients: List[str]  # Array, with each ingredient. As list because each recipe will vary in number of ingredients.
     Instructions: str  # For the instructions.
     Image: str  # Link to image
-
-async def connect_to_db():
-    conn = await asyncpg.connect(DATABASE_URL)
-    return conn
-
-@app.post("/recipe_details/")
-def create_recipe_details(recipe_details: RecipeDetails):
-    recipe_detail.append(recipe_details)
-    return recipe_detail
-
-@app.get("/recipe_details/")
-def read_recipe_details():
-    return recipe_detail
-
-@app.put("/recipe_details/{recipe_details_id}")
-def update_recipe_details(recipe_details_id: int, recipe_details: RecipeDetails):
-    recipe_detail[recipe_details_id] = recipe_details
-    return recipe_details
-
-@app.delete("/recipe_details/{recipe_details_id}")
-def delete_recipe_details(recipe_details_id: int):
-    recipe_detail.pop(recipe_details_id)
-    return {"message": "recipe_details deleted"}
 
 #
 # if __name__ == "__main__":
