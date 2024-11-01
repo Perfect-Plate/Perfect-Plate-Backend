@@ -16,21 +16,21 @@ async def connect_to_db():
     conn = await asyncpg.connect(DATABASE_URL)
     return conn
 
-@app.post("/nutritions/")
+@app.post("/recipe_details/")
 def create_nutrition(nutrition: Nutrition):
     nutritions.append(nutrition)
     return nutritions
 
-@app.get("/nutritions/")
+@app.get("/recipe_details/")
 def read_nutrition():
     return nutritions
 
-@app.put("/nutritions/{Nutrition_id}")
+@app.put("/recipe_details/{Nutrition_id}")
 def update_Nutrition(Nutrition_id: int, Nutrition: Nutrition):
     nutritions[Nutrition_id] = Nutrition
     return Nutrition
 
-@app.delete("/nutritions/{Nutrition_id}")
+@app.delete("/recipe_details/{Nutrition_id}")
 def delete_Nutrition(Nutrition_id: int):
     nutritions.pop(Nutrition_id)
     return {"message": "Nutrition deleted"}
