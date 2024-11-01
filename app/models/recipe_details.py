@@ -43,12 +43,12 @@ def delete_recipe_details(recipe_details_id: int):
     recipe_detail.pop(recipe_details_id)
     return {"message": "recipe_details deleted"}
 
-
-if __name__ == "__main__":
-    import uvicorn
-
-    rd = RecipeDetails(Name="banana", Ingredients=["peel,banana,yellow"], Instructions="Peel banana, Eat banana",
-                       Image="https://th.bing.com/th/id/R.0f3cc1b69f7046e6355687263aead9ee?rik=e%2fzLRdxmCMtNRA&riu=http%3a%2f%2fupload.wikimedia.org%2fwikipedia%2fcommons%2f6%2f69%2fBanana.png&ehk=0MA9r3huU44GTjIIWGK6A1R0At%2bSPNmztxBBWKsquWw%3d&risl=1&pid=ImgRaw&r=0")
-
-    create_recipe_details(rd)
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+#
+# if __name__ == "__main__":
+#     import uvicorn
+#
+#     rd = RecipeDetails(Name="banana", Ingredients=["peel,banana,yellow"], Instructions="Peel banana, Eat banana",
+#                        Image="https://th.bing.com/th/id/R.0f3cc1b69f7046e6355687263aead9ee?rik=e%2fzLRdxmCMtNRA&riu=http%3a%2f%2fupload.wikimedia.org%2fwikipedia%2fcommons%2f6%2f69%2fBanana.png&ehk=0MA9r3huU44GTjIIWGK6A1R0At%2bSPNmztxBBWKsquWw%3d&risl=1&pid=ImgRaw&r=0")
+#
+#     create_recipe_details(rd)
+#     uvicorn.run(app, host="0.0.0.0", port=8000)
