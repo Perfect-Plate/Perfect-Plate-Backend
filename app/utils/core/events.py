@@ -7,13 +7,20 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.database.db_connect import client
+from app.utils.core.settings import logger
 
 
+# Lifespan event manager
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Lifecycle events"""
-    client.table("users").select("*").execute()
-    yield  # You can add any startup logic here if needed
-    logging.info("lifespan shutdown")
+    """Manage application startup and shutdown."""
+    # Startup logic
+    logger.info("Starting up lifespan event.")
+    yield
+    # Shutdown logic
+    logger.info("Shutting down lifespan event.")
+    client.close()
+

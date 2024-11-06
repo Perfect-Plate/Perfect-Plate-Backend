@@ -9,3 +9,12 @@ GET http://127.0.0.1:8000/hello/User
 Accept: application/json
 
 ###
+###
+GET http://localhost:8000/user/users/123firstUser/preferences/
+Accept: application/json
+
+
+###
+GET http://localhost:8000/user/users/123firstUser/meal-plans/
+Accept: application/json
+

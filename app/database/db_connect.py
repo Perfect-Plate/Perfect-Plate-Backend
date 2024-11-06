@@ -1,41 +1,23 @@
-import logging
-from typing import Annotated
-from dotenv import load_dotenv
 import os
-from fastapi import Depends, HTTPException
-from supabase import create_client, Client
 
-from app.models.dietarypreferences import DietaryPreferences
+import certifi
+from dotenv import load_dotenv
+from motor.motor_asyncio import AsyncIOMotorClient
 
-# Load environment variables from .env file
 load_dotenv()
 
-# Create Supabase client using environment variables
-url: str = os.environ.get("SUPABASE_URL")
-key: str = os.environ.get("SUPABASE_KEY")
 
-print(f"Supabase URL: {url}, Key: {key}")  # Debugging line
+# MongoDB client setup
+client = AsyncIOMotorClient(os.environ["MONGODB_URL"], tlsCAFile=certifi.where())
+db = client.perfect_plates
+users_collection = db.get_collection("users")
+preferences_collection = db.get_collection("preferences")
+meal_plans_collection = db.get_collection("meal_plans")
+recipes_collection = db.get_collection("recipes")
 
-if not url or not key:
-    logging.error("Supabase URL or Key not found in environment variables.")
-    raise ValueError("Supabase URL and Key must be set in the environment variables.")
-
-# Create the Supabase client
-client: Client = create_client(url, key)
-
-#
-# async def get_db() -> Client:
-#     """Get a Supabase client without user authentication."""
-#     try:
-#         # Check if the connection is successful
-#         response = client.table("users").select("*").execute()
-#         if not response:  # Change this line to access the data attribute
-#             raise HTTPException(status_code=500, detail="Database connection failed")
-#         return client  # Return the client directly
-#
-#     except Exception as e:
-#         logging.error(f"Database connection error: {e}")
-#         raise HTTPException(status_code=500, detail="Database connection error")
-#
-#
-# SessionDep = Annotated[Client, Depends(get_db)]
+# client = AsyncIOMotorClient(os.environ.get("MONGODB_URL"))
+# db = client.perfect_plates
+# users = db.users
+# preferences = db.preferences
+# meal_plans = db.meal_plans
+# recipes = db.recipes
