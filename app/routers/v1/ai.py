@@ -5,7 +5,7 @@ openapi = APIRouter()
 
 @openapi.get("/")
 async def root():
-    return {"message": "Ai related endpoints"}
+    return {"message": "Project start"}
 
 
 @openapi.get("/prompt")

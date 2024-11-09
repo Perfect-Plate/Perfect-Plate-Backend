@@ -8,7 +8,6 @@ from typing import List, Optional
 import enum
 
 
-
 # Custom field for MongoDB ObjectId
 class PyObjectId(ObjectId):
     @classmethod
@@ -25,7 +24,7 @@ class PyObjectId(ObjectId):
     def __get_pydantic_json_schema__(cls, field_schema: Dict[str, Any]) -> Dict[str, Any]:
         field_schema.update(type="string")
         return field_schema
-    
+
 
 # Enum Classes for Pydantic Models
 class CuisineType(str, enum.Enum):
@@ -36,7 +35,6 @@ class CuisineType(str, enum.Enum):
     THAI = "Thai"
     JAPANESE = "Japanese"
     ITALIAN = "Italian"
-    
 
 
 class MealType(str, enum.Enum):
@@ -81,11 +79,15 @@ class UserPreferenceCreate(BaseModel):
     is_deleted: bool = False
 
 
-class MealPlanCreate(BaseModel):
+# 12Am date  12PM date =>  week
+
+class MealPlanCreate(BaseModel):  # 07/11/2024 Lunch [Tea, Sandwich]
     user_id: str
     date: date
     meal_type: MealType
-    recipe_id: int
+    recipe_id: List[str]
+    created_at: date
+    updated_at: date
 
 
 class RecipeCreate(BaseModel):
@@ -116,8 +118,6 @@ class RecipeCreate(BaseModel):
     date_updated: date
     is_active: bool = True
     is_deleted: bool = False
-
-
 
 
 # Existing Enums
