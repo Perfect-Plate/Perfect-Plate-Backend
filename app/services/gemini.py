@@ -1,7 +1,8 @@
+import re  # RegEX
+
 import google.generativeai as genai
 import requests
 from bs4 import BeautifulSoup
-import re  # RegEX
 from transformers import pipeline
 
 
