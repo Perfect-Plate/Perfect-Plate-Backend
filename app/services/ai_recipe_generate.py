@@ -3,6 +3,7 @@ from http.client import HTTPException
 
 import os
 import uuid
+from random import random
 from typing import Dict, Any
 
 import requests
@@ -13,7 +14,7 @@ from llama_cloud.types import llm
 from llama_index.core.query_pipeline import QueryPipeline as QP
 
 from app.database.db_connect import meal_plans_collection
-from app.models.models import WeeklyMealPlan, WeekType, DailyMealPlan, MealType, RecipeCreate
+from app.models.models import WeeklyMealPlan, DailyMealPlan, MealType, RecipeCreate
 from llama_index.core.llms import ChatMessage
 from llama_index.llms.openai import OpenAI
 from llama_index.embeddings.openai import OpenAIEmbedding
@@ -120,71 +121,49 @@ class AIGenerateMealPlan:
         user_preferences = await UserPreferenceService.get_preferences(user_id)
         preference_list = generate_preferences_template(user_preferences)
 
-        # get the start date
         current_date = datetime.fromisoformat(start_date)
+        used_recipes = set()  # Keep track of used recipes
 
-        recipes = ""
-
-        # if url is provided, scrape the website and get the recipes using beautifulsoup
-        if url:
-            # Scrape the website and get the recipes
-            recipes = scrape_recipes(url)
-
-        # Initialize an empty list to hold daily meal plans
         daily_plans = []
+        previous_day_recipes = {meal_type: None for meal_type in [MealType.BREAKFAST, MealType.LUNCH, MealType.DINNER]}
 
-        # create templates if url is not provided
-
-        # Loop to generate a meal plan for each day of the week with unique recipes
         for day_offset in range(7):
             day_date = current_date + timedelta(days=day_offset)
             daily_recipes = []
 
-            # Define the meals we want for each day
             for meal_type in [MealType.BREAKFAST, MealType.LUNCH, MealType.DINNER]:
-                temp1 = f"Generate a unique {meal_type.value} with different recipes for each day {day_date.date()} based on "
-                f"the following user preferences: {preference_list}. Include details such as ingredients, "
-                f"instructions and cuisine. remember not to include user allergies or restricted "
-                f"ingredients in the recipe. consider user description: {user_description}"
-
-                # temp2, include the scraped recipes
-                temp2 = f"Generate a unique {meal_type.value} with different recipes for each day {day_date.date()} based on "
-                f"the following user preferences: {preference_list}. Include details such as ingredients, "
-                f"instructions and cuisine. remember not to include user allergies or restricted, "
-                f"ingredients in the recipe. consider user description: {user_description}  and Here are some recipes "
-                f"you can use: {recipes}"
-
-                prompt = temp1 if not url else temp2
-
-                # Set up structured language model (SLLM) to generate a specific meal type for each day
-                sllm = llm.as_structured_llm(output_cls=RecipeCreate)
-                chat_prompt_tmpl = ChatPromptTemplate(
-                    message_templates=[
-                        ChatMessage.from_str(
-                            prompt,
-                            role="user"
+                if url:
+                    # Scrape recipes from the provided URL
+                    recipes = scrape_recipes(url)
+                    recipe = AIGenerateMealPlan._get_unique_recipe(
+                        recipes, used_recipes, user_preferences, meal_type, preference_list
+                    )
+                else:
+                    # Skip the previous day's recipe on the first day
+                    if day_offset == 0:
+                        recipe = AIGenerateMealPlan._generate_unique_recipe(
+                            user_preferences, meal_type, preference_list, None  # No previous recipe for the first day
                         )
-                    ]
-                )
+                    else:
+                        # Pass the previous day's recipe as context on subsequent days
+                        previous_recipe = previous_day_recipes[meal_type]
+                        recipe = AIGenerateMealPlan._generate_unique_recipe(
+                            user_preferences, meal_type, preference_list, previous_recipe
+                        )
 
-                qp = QP(chain=[chat_prompt_tmpl, sllm])
-                recipe = qp.run()
-                print(f"Generated {meal_type.value} recipe for {day_date.date()}: {recipe}")
-
-                # Append the generated recipe to the daily recipes
                 daily_recipes.append(recipe)
+                used_recipes.add(recipe.title)  # Add the recipe to the used recipes set
+                previous_day_recipes[meal_type] = recipe  # Store for next day's context
 
-            # Create a DailyMealPlan with the collected recipes
             daily_plan = DailyMealPlan(
                 date=day_date.date(),
                 recipes=daily_recipes
             )
             daily_plans.append(daily_plan)
 
-        # Create the weekly meal plan object
         weekly_meal_plan = WeeklyMealPlan(
             user_id=user_id,
-            meal_id=str(uuid.uuid4()),  # Convert UUID to a string
+            meal_id=str(uuid.uuid4()),
             meal_date=current_date.date(),
             days=daily_plans,
             saved=False,
@@ -192,24 +171,71 @@ class AIGenerateMealPlan:
             updated_at=datetime.now()
         )
 
-        # Convert the model to a dict and prepare it for MongoDB
         meal_plan_dict = weekly_meal_plan.model_dump()
         prepared_dict = AIGenerateMealPlan._prepare_for_mongodb(meal_plan_dict)
-
-        # Insert the prepared dictionary into MongoDB
-        result = await meal_plans_collection.insert_one(prepared_dict)
-        if not result.inserted_id:
-            raise Exception("Failed to create meal plan")
-
-        # Update the ID with the one from MongoDB and return the WeeklyMealPlan object
-        weekly_meal_plan.meal_id = result.inserted_id
+        weekly_meal_plan = await meal_plans_collection.insert_one(prepared_dict)
         return weekly_meal_plan.model_dump()
 
-    @classmethod
-    async def get_meal_plan(cls, user_id, meal_plan_id) -> dict:
+    @staticmethod
+    def _generate_unique_recipe(user_preferences, meal_type, preference_list, previous_recipe):
+        # Generate a new recipe that matches user preferences, incorporating the previous day's meal as context if
+        # available
+        context = f"Previous day's {meal_type.value}: {previous_recipe.title} with ingredients {', '.join(previous_recipe.ingredients)}." if previous_recipe else ""
+        prompt = (f"{context} Generate a unique {meal_type.value} recipe for today with different ingredients "
+                  f"based on the following user preferences:\n{preference_list}. "
+                  f"consider user_preferences: \n{user_preferences}(\n"
+                  )
+
+        sllm = llm.as_structured_llm(output_cls=RecipeCreate)
+        chat_prompt_tmpl = ChatPromptTemplate(
+            message_templates=[
+                ChatMessage.from_str(
+                    prompt,
+                    role="user"
+                )
+            ]
+        )
+
+        qp = QP(chain=[chat_prompt_tmpl, sllm])
+        try:
+            recipe = qp.run()
+        except Exception as e:
+            print(f"Error during query pipeline execution: {e}")
+            raise
+
+        print(f"Generated {meal_type.value}: {recipe}")
+        return recipe
+
+    @staticmethod
+    def _matches_preferences(recipe, user_preferences, meal_type):
+        # Check if the recipe matches the user's dietary preferences and restrictions
+        return (recipe.meal_type == meal_type and
+                all(ingredient not in user_preferences.restricted_ingredients for ingredient in recipe.ingredients) and
+                all(cuisine not in user_preferences.restricted_cuisines for cuisine in [recipe.cuisine]) and
+                all(meal_type not in user_preferences.restricted_meal_types))
+
+    @staticmethod
+    async def get_meal_plan(user_id: str, meal_plan_id: str) -> Dict[str, Any]:
         meal_plan = await meal_plans_collection.find_one({"user_id": user_id, "meal_id": meal_plan_id})
         if not meal_plan:
             raise HTTPException(status_code=404, detail="Meal plan not found")
+        return meal_plan
 
-        # Convert MongoDB document to Pydantic model format
-        return WeeklyMealPlan.from_mongo(meal_plan)
+    @classmethod
+    def _get_unique_recipe(cls, recipes, used_recipes, user_preferences, meal_type, preference_list):
+        # Get a unique recipe from the list of scraped recipes
+        for recipe in recipes:
+            if recipe['title'] not in used_recipes:
+                recipe_create = RecipeCreate(
+                    title=recipe['title'],
+                    ingredients=recipe['ingredients'],
+                    instructions=recipe['instructions'],
+                    meal_type=meal_type,
+                    cuisine=meal_type,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now()
+                )
+                if cls._matches_preferences(recipe_create, user_preferences, meal_type):
+                    return recipe_create
+        return cls._generate_unique_recipe(user_preferences, meal_type, preference_list)
+
