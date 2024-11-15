@@ -4,16 +4,28 @@ import requests
 from bs4 import BeautifulSoup
 from transformers import pipeline
 import json
+import nltk
+from nltk.corpus import words
 
 
 # REFERENCES:
 # https://huggingface.co/docs/transformers/quicktour
 # https://huggingface.co/tanvircr7/learn_hf_food_not_food_text_classifier-distilbert-base-uncased?library=transformers
 
+nltk.download('words')
+classifier = pipeline("text-classification",model="tanvircr7/learn_hf_food_not_food_text_classifier-distilbert-base-uncased")
 class WebScraper:
     def toJson(string):
         try:
-            return json.loads(string)
+            strings = string + ""
+            json_start = strings.find('{')
+            json_end = strings.rfind('}') + 1
+            json_string = strings[json_start:json_end]
+
+
+            json_object = json.loads(json_string)
+            formatted_json_string = json.dumps(json_object, indent=4)
+            return formatted_json_string
         except:
             print("Error")
             return None
@@ -34,42 +46,57 @@ class WebScraper:
             for ingredient in soup.find_all(['li', 'span', 'div'],
                                             class_=lambda x: x and ('ingredient' in x.lower() or 'prep' in x.lower())):
                 ingredients.append(ingredient.get_text())
+        templist = []
+        startat = 0
+        found = False
+        recipe = "".join(ingredients)
+        recipe = re.sub(r'[^\w\s]', '', recipe)
+        recipe = re.sub(r'\s+', ' ', recipe).strip()
 
-        classifier = pipeline("text-classification",
-                                  model="tanvircr7/learn_hf_food_not_food_text_classifier-distilbert-base-uncased")
+        ingredients = recipe.split(" ")
+        if(len(ingredients) > 125):
+            for i in range(len(ingredients)-1,-1,-1):
+                if "ingredient" in ingredients[i].lower():
+                    if(len(ingredients) - i) > 30:
+                        found = True
+                        startat = i
+                        ingredients[i] = "Ingredients:"
+                    continue
+                if found:
+                    break
+            if found:
+                for j in range(startat,len(ingredients)):
+                    templist.append(ingredients[j])
+        ingredients = templist
+
         # Split link by commas
         linksplit = link.split('/')
+        print(linksplit)
 
-        # Initialize an empty list to store extracted food terms
-        extracted = []
-        probabilities = []
-        # Check each word for food-related classification
-        for word in linksplit:
-            result = classifier(word)
-            if result[0]['label'] == 'food' & word != "food" & word != "recipe" & word != "recipes":
-                extracted.append(word)
-                probabilities.append(result[0]['score'])
-
-            # Loop to determine which of the 'food' words is the most likely to be related to the recipe
-        largest = 0
-        for i in range(len(probabilities)):
-            if (probabilities[i] > probabilities[largest]):
-                largest = i
-        result = extracted[largest]
-        result = re.sub(r'\d', '', result)
+        filtered = []
+        result = linksplit[len(linksplit)-2]
+        result = re.sub(r'\d', ' ', result)
         result = re.sub(r'-', ' ', result)
+        eng = set(words.words())
+        print(result)
+        for word in result:
+            isfood = classifier(word)
+            print(word)
+            print(isfood)
+            if word.lower() in eng or isfood[0]['label'] == 'food':
+                filtered.append(word)
+
+
+        result = ''.join(filtered)
 
         return ingredients, result
 
 if __name__ == '__main__':
     app = WebScraper
-    ingredients,result = app.scrapeWeb("https://www.hiddenvalley.com/recipe/glazed-hidden-valley-ham/")
-    recipe = "".join(ingredients)
-    recipe = re.sub(r'[^\w\s]','',recipe)
-    recipe = re.sub(r'\s+',' ',recipe)
-    recipe = recipe.strip()
+    ingredientlist,result = app.scrapeWeb("https://www.mccormick.com/recipes/breakfast-brunch/tropical-acai-bowl?msockid=3218975560e56c103fc78264616f6da5")
+    recipe = " ".join(ingredientlist)
     prompt = f'''
-    Please provide a recipe for {result} in the following format, without including ANYTHING else in the response:
+    Please provide a high protien recipe for {result} in the following format:
     {{
       "recipename": "Your Recipe Name Here",
       "ingredients": [
@@ -84,14 +111,15 @@ if __name__ == '__main__':
       ],
       "recipe": "Detailed or summarized recipe description here."
     }}
-    Using this recipe as a baseline: {", ".join(ingredients)}
+    Using this recipe as a baseline: {recipe}
     '''
-    # print(prompt)
+    print(prompt)
     print(recipe)
     print(result)
-    genai.configure(api_key="AIzaSyBmkA7aY9ZwTWCHhGaeZlw1o-UQ0ibR2gU")
+    genai.configure(api_key="APIKEY")
     model = genai.GenerativeModel("gemini-1.5-flash")
     response = model.generate_content(prompt)
     print(response.text)
     jsonHolder = app.toJson(response.text)
+    print("JSON:")
     print(jsonHolder)
