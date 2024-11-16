@@ -1,4 +1,3 @@
-from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorClient
 from fastapi import HTTPException
 from datetime import datetime, date  # Add date to the import
@@ -78,7 +77,7 @@ class UserPreferenceService:
         return pref_data
 
     @staticmethod
-    async def get_preferences(user_id: str):
+    async def get_preferences(user_id: str) -> UserPreferenceCreate:
         preferences = await preferences_collection.find_one({"user_id": user_id})
         if preferences is None:
             raise HTTPException(status_code=404, detail="Preferences not found")
