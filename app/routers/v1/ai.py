@@ -23,7 +23,7 @@ async def get_meal_plan(user_id: str, meal_plan_id: str):
     return await AIGenerateMealPlan.get_meal_plan(user_id, meal_plan_id)
 
 
-@openapi.post("/ai/create_meal_plan/", response_model=WeeklyMealPlan)
+@openapi.post("/ai/create_meal_plan/", response_model=dict)
 async def generate_meal_plan(user_id: str, start_date: str, user_description: str, url: Optional[str] = ""):
     user = await UserService.get_user(user_id)
     if not user:
