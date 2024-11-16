@@ -6,8 +6,6 @@ from transformers import pipeline
 import json
 import nltk
 from nltk.corpus import words
-
-
 # REFERENCES:
 # https://huggingface.co/docs/transformers/quicktour
 # https://huggingface.co/tanvircr7/learn_hf_food_not_food_text_classifier-distilbert-base-uncased?library=transformers
@@ -52,9 +50,15 @@ class WebScraper:
         recipe = "".join(ingredients)
         recipe = re.sub(r'[^\w\s]', '', recipe)
         recipe = re.sub(r'\s+', ' ', recipe).strip()
+        # Insert a space between capital and lowercase letters
+        recipe = re.sub(r'(?<!\s)(?=[A-Z])', ' ', recipe)
+        # Insert a space between numbers and letters
+        recipe = re.sub(r'(?<=\d)(?=[a-zA-Z])', ' ', recipe)
+        recipe = re.sub(r'(?<=[a-zA-Z])(?=\d)', ' ', recipe)
+        recipe = re.sub(r'(?<!\s)(?=[¼½¾⅛⅜⅝⅞])',' ',recipe)
 
         ingredients = recipe.split(" ")
-        if(len(ingredients) > 125):
+        if(len(ingredients) > 50):
             for i in range(len(ingredients)-1,-1,-1):
                 if "ingredient" in ingredients[i].lower():
                     if(len(ingredients) - i) > 30:
@@ -67,22 +71,33 @@ class WebScraper:
             if found:
                 for j in range(startat,len(ingredients)):
                     templist.append(ingredients[j])
-        ingredients = templist
+        segments = " ".join(templist)
+        unspacedSegs = re.sub(r'\s+','', segments)
+        unspacedSegs = re.split(r'(?=\d+|[¼½¾⅛⅜⅝⅞]|\d+ [¼½¾⅛⅜⅝⅞])',unspacedSegs)
+        spacedSegs = re.split(r'(?=\d+|[¼½¾⅛⅜⅝⅞]|\d+ [¼½¾⅛⅜⅝⅞])', segments)
+        seen = set()
+        unique = []
+        for i in range(len(unspacedSegs)):
+            if unspacedSegs[i] not in seen:
+                seen.add(unspacedSegs[i])
+                unique.append(spacedSegs[i])
+        ingredients = " ".join(unique)
 
         # Split link by commas
         linksplit = link.split('/')
-        print(linksplit)
 
         filtered = []
-        result = linksplit[len(linksplit)-2]
-        result = re.sub(r'\d', ' ', result)
-        result = re.sub(r'-', ' ', result)
-        eng = set(words.words())
+        if linksplit[-1] == '':
+            result = linksplit[len(linksplit) - 2]
+        else:
+            result = linksplit[-1]
+        # Replace non-word characters with space
+        result = re.sub(r'\W+', ' ', result)
         print(result)
+        eng = set(words.words())
+
         for word in result:
             isfood = classifier(word)
-            print(word)
-            print(isfood)
             if word.lower() in eng or isfood[0]['label'] == 'food':
                 filtered.append(word)
 
@@ -93,8 +108,7 @@ class WebScraper:
 
 if __name__ == '__main__':
     app = WebScraper
-    ingredientlist,result = app.scrapeWeb("https://www.mccormick.com/recipes/breakfast-brunch/tropical-acai-bowl?msockid=3218975560e56c103fc78264616f6da5")
-    recipe = " ".join(ingredientlist)
+    recipe,result = app.scrapeWeb("https://www.mccormick.com/recipes/breakfast-brunch/tropical-acai-bowl?msockid=3218975560e56c103fc78264616f6da5")
     prompt = f'''
     Please provide a high protien recipe for {result} in the following format:
     {{
