@@ -8,7 +8,6 @@ from typing import List, Optional
 import enum
 
 
-
 # Custom field for MongoDB ObjectId
 class PyObjectId(ObjectId):
     @classmethod
@@ -25,7 +24,7 @@ class PyObjectId(ObjectId):
     def __get_pydantic_json_schema__(cls, field_schema: Dict[str, Any]) -> Dict[str, Any]:
         field_schema.update(type="string")
         return field_schema
-    
+
 
 # Enum Classes for Pydantic Models
 class CuisineType(str, enum.Enum):
@@ -36,14 +35,12 @@ class CuisineType(str, enum.Enum):
     THAI = "Thai"
     JAPANESE = "Japanese"
     ITALIAN = "Italian"
-    
 
 
 class MealType(str, enum.Enum):
     BREAKFAST = "Breakfast"
     LUNCH = "Lunch"
     DINNER = "Dinner"
-    SNACK = "Snack"
 
 
 # Pydantic Models
@@ -81,11 +78,15 @@ class UserPreferenceCreate(BaseModel):
     is_deleted: bool = False
 
 
-class MealPlanCreate(BaseModel):
+# 12Am date  12PM date =>  week
+
+class MealPlanCreate(BaseModel):  # 07/11/2024 Lunch [Tea, Sandwich]
     user_id: str
     date: date
     meal_type: MealType
-    recipe_id: int
+    recipe_id: List[str]
+    created_at: date
+    updated_at: date
 
 
 class RecipeCreate(BaseModel):
@@ -95,29 +96,25 @@ class RecipeCreate(BaseModel):
     instructions: List[str]
     cuisine: CuisineType
     meal_type: MealType
-    calories: int = None
-    protein: int = None
-    fat: int = None
-    sodium: int = None
-    carb: int = None
-    image_url: str = None
+    image_url: Optional[str] = None
     video_url: Optional[str] = None
     source: Optional[str] = None
-    tags: List[str] = []
-    allergens: List[str] = []
-    servings: int = None
-    prep_time: int = None
-    cook_time: int = None
-    total_time: int = None
-    difficulty: int = None
-    rating: int = None
+    calories: Optional[int] = 0
+    protein: Optional[int] = 0
+    fat: Optional[int] = 0
+    sodium: Optional[int] = 0
+    carb: Optional[int] = 0
+    servings: Optional[int] = 1
+    prep_time: Optional[int] = 0
+    cook_time: Optional[int] = 0
+    total_time: Optional[int] = 0
+    difficulty: Optional[int] = 1
+    rating: Optional[int] = None
     reviews: List[str] = []
     date_added: date
     date_updated: date
     is_active: bool = True
     is_deleted: bool = False
-
-
 
 
 # Existing Enums
@@ -146,18 +143,25 @@ class DailyMealPlan(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     date: date
-    is_selected: bool = False
-    meal_types: List[MealType] = []
-    recipes: Dict[MealType, List[str]] = Field(default_factory=dict)
+    recipes: List[RecipeCreate] = []
 
 
 class WeeklyMealPlan(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    week_type: WeekType
+    # model_config = ConfigDict(arbitrary_types_allowed=True)
+    user_id: str
+    meal_id: str
+    meal_date: date
     days: List[DailyMealPlan]
+    saved: bool = False
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
+
+    @classmethod
+    def from_mongo(cls, data: dict):
+        """Convert MongoDB data to a model-friendly format"""
+        if "_id" in data:
+            data["id"] = str(data.pop("_id"))  # Convert `_id` ObjectId to a string if necessary
+        return cls(**data)
 
 
 class MealTypeSettings(BaseModel):
