@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, date
 from http.client import HTTPException
 import os
 import uuid
+import webscrape_service as ws
 from typing import Dict, Any, Optional
 import requests
 from bs4 import BeautifulSoup
@@ -208,23 +209,27 @@ class AIGenerateMealPlan:
 
     @staticmethod
     def _scrape_recipes(url: str):
-        response = requests.get(url)
+        scrape = ws.WebScrapeService
+        HEADER = {"User-Agent": "Mozilla/5.0"}  # Prevents blocks on certain sites
+        response = requests.get(url, headers=HEADER)
         soup = BeautifulSoup(response.text, 'html.parser')
-        recipes = soup.find_all('div', class_='recipe')
         current_time = datetime.now()
-
-        return [{
-            "title": recipe.find('h2').text,
-            "description": recipe.find('p', class_='description').text if recipe.find('p',
-                                                                                      class_='description') else f"A delicious {recipe.find('h2').text}",
-            "ingredients": [i.text for i in recipe.find('ul').find_all('li')],
-            "instructions": [i.text for i in recipe.find('ol').find_all('li')],
-            "cuisine": DEFAULT_CUISINE,
+        title = scrape.getTitle(url)
+        ingredients = scrape.getIngredients(soup)
+        description = soup.find('p', class_='description')
+        if description == '':
+            description = f"A delicious {title}"
+        instructions = scrape.getInstructions(soup)
+        return {
+            "title": title,
+            "description": description,
+            "ingredients": ingredients,
+            "instructions": instructions,
             "created_at": current_time,
             "updated_at": current_time,
             "date_added": current_time.date(),
             "date_updated": current_time.date()
-        } for recipe in recipes]
+        }
 
     @staticmethod
     def _matches_preferences(recipe: RecipeCreate, user_preferences, meal_type: MealType) -> bool:
