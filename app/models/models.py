@@ -1,3 +1,5 @@
+import uuid
+
 from pydantic import BaseModel, EmailStr
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from datetime import date, datetime
@@ -90,6 +92,9 @@ class MealPlanCreate(BaseModel):  # 07/11/2024 Lunch [Tea, Sandwich]
 
 
 class RecipeCreate(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     title: str
     description: str
     ingredients: List[str]
@@ -147,7 +152,6 @@ class DailyMealPlan(BaseModel):
 
 
 class WeeklyMealPlan(BaseModel):
-    # model_config = ConfigDict(arbitrary_types_allowed=True)
     user_id: str
     meal_id: str
     meal_date: date
@@ -155,6 +159,10 @@ class WeeklyMealPlan(BaseModel):
     saved: bool = False
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
+
+    class Config:
+        json_encoders = {ObjectId: str}
+        populate_by_name = True
 
     @classmethod
     def from_mongo(cls, data: dict):
