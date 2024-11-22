@@ -17,6 +17,7 @@ from types import SimpleNamespace
 from app.database.db_connect import meal_plans_collection, recipes_collection
 from app.models.models import WeeklyMealPlan, DailyMealPlan, MealType, RecipeCreate, CuisineType
 from app.services.services import UserPreferenceService
+from app.services.webscrapeservice import WebScrapeService
 
 load_dotenv()
 
@@ -225,14 +226,45 @@ class AIGenerateMealPlan:
 
     @staticmethod
     def _scrape_recipes(url: str):
-        response = requests.get(url)
+        scrape = WebScrapeService()
+        HEADER = {"User-Agent": "Mozilla/5.0"}  # Prevents blocks on certain sites
+        response = requests.get(url, headers=HEADER)
+
+        if response.status_code != 200:
+            raise ValueError(f"Failed to retrieve the webpage, status code: {response.status_code}")
+
         soup = BeautifulSoup(response.text, 'html.parser')
-        recipes = soup.find_all('div', class_='recipe')
-        return [{
-            "title": recipe.find('h2').text,
-            "ingredients": [i.text for i in recipe.find('ul').find_all('li')],
-            "instructions": [i.text for i in recipe.find('ol').find_all('li')]
-        } for recipe in recipes]
+        current_time = datetime.now()
+
+        # Get title, ingredients, description, and instructions
+        title = scrape.getTitle(url)
+        ingredients = scrape.getIngredients(soup)
+
+        # Check ingredients type
+        print(f"Ingredients (before checking): {ingredients} -- Type: {type(ingredients)}")
+
+        # Get description with fallback to default title-based description
+        description_tag = soup.find('p', class_='description')
+        description = description_tag.text.strip() if description_tag else f"A delicious {title}"
+
+        instructions = scrape.getInstructions(soup)
+
+        # Check instructions type
+        print(f"Instructions (before checking): {instructions} -- Type: {type(instructions)}")
+
+        # Create the recipe dictionary
+        full_recipe = {
+            "title": title,
+            "ingredients": ingredients,
+            "description": description,
+            "instructions": instructions
+        }
+        print(full_recipe)
+
+        # Debugging: Check full_recipe structure
+        print(f"Full recipe dictionary (before returning): {full_recipe}")
+
+        return full_recipe
 
     @staticmethod
     def _matches_preferences(recipe: RecipeCreate, user_preferences, meal_type: MealType) -> bool:
