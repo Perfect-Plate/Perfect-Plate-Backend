@@ -1,8 +1,9 @@
+import re
 from datetime import datetime, timedelta, date
 from http.client import HTTPException
 import os
 import uuid
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from bson import ObjectId
 import requests
 from bs4 import BeautifulSoup
@@ -240,23 +241,22 @@ class AIGenerateMealPlan:
         title = scrape.getTitle(url)
         ingredients = scrape.getIngredients(soup)
 
-        # Check ingredients type
-        print(f"Ingredients (before checking): {ingredients} -- Type: {type(ingredients)}")
-
         # Get description with fallback to default title-based description
         description_tag = soup.find('p', class_='description')
         description = description_tag.text.strip() if description_tag else f"A delicious {title}"
 
-        instructions = scrape.getInstructions(soup)
 
-        # Check instructions type
-        print(f"Instructions (before checking): {instructions} -- Type: {type(instructions)}")
+        instructions = scrape.getInstructions(soup)
+        if not instructions:
+            instructions = ["No Instructions Found."]
+        print(ingredients)
+        print(instructions)
 
         # Create the recipe dictionary
         full_recipe = {
             "title": title,
-            "ingredients": ingredients,
             "description": description,
+            "ingredients": ingredients,
             "instructions": instructions
         }
         print(full_recipe)
@@ -285,12 +285,33 @@ class AIGenerateMealPlan:
     @classmethod
     def _get_unique_recipe(cls, recipes, used_recipes, user_preferences, meal_type, preference_list):
         for recipe in recipes:
-            if recipe['title'] not in used_recipes:
+            if recipe[0] not in used_recipes:
+                title = recipe[0]
+                title = "".join(title)
+                description = recipe[1]
+                description = "".join(description)
+                ingredients = recipe[2]
+                instructions = recipe[3].split(".")
+                ingredient_pattern = re.compile(r'(\d+\s?\d*\/\d+|\d+\s?\d+\s?)([a-zA-Z]+[\w\s]*)')
+                ingredient_lines = ingredients.split('  ')
+                processed_ingredients = []
+                for line in ingredient_lines:
+                    line = line.strip()
+                    if line:  # Skip empty lines
+                        match = re.match(ingredient_pattern, line)
+                        if match:
+                            quantity = match.group(1).strip()
+                            ingredient_name = match.group(2).strip()
+                            processed_ingredients.append(f"{quantity} {ingredient_name}")
+                        else:
+                            processed_ingredients.append(line)  # If no match, append the line as is
+                ingredients = processed_ingredients
+
                 recipe_create = RecipeCreate(
-                    title=recipe['title'],
-                    description=f"A delicious {recipe['title']} recipe",  # Added description
-                    ingredients=recipe['ingredients'],
-                    instructions=recipe['instructions'],
+                    title=title,
+                    description=description,
+                    ingredients=ingredients,
+                    instructions=instructions,
                     meal_type=meal_type,
                     cuisine=CuisineType.AMERICAN,  # Default cuisine
                     calories=0,

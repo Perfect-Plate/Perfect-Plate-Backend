@@ -54,15 +54,13 @@ class WebScrapeService:
             if text:
                 instructions.append(text)  # Add non-empty instruction to the list
 
-        # Debugging: Print the list of instructions before returning
-        print(f"Instructions (as list): {instructions} -- Type: {type(instructions)}")
 
         return instructions  # Return the list of instructions
 
     def getIngredients(self, soup):
         """Extracts ingredients from the page."""
         ingredients = []
-        for ingredient in soup.find_all(['li', 'span', 'div'],
+        for ingredient in soup.find_all(['li', 'span', 'div', 'ul'],
                                         class_=lambda x: x and ('ingredient' in x.lower() or 'prep' in x.lower())):
             ingredients.append(ingredient.get_text())
 
@@ -82,6 +80,7 @@ class WebScrapeService:
         print(f"Ingredients (after cleanup): {recipe}")
 
         ingredients = recipe.split(" ")
+
         if len(ingredients) > 50:
             templist, found = self.findWord("ingredient", ingredients, found)
             if not found:
@@ -101,9 +100,10 @@ class WebScrapeService:
             ingredients = unique  # Keep as a list of ingredients
 
         # Debugging - print final ingredients to check
-        print(f"Final Ingredients: {ingredients}")
 
-        return ingredients  # Return as list of ingredients
+        finished = " ".join(ingredients)
+        print(finished)
+        return finished  # Return as list of ingredients
 
     def findWord(self, word, ingredients, found):
         """Search for a word like 'ingredient' or 'prep' in the list."""
