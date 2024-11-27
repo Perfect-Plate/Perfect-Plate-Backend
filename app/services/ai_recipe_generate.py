@@ -51,9 +51,9 @@ def generate_preferences_template(user_preferences):
     if getattr(user_preferences, 'allergies', []):
         preferences.append(f"Allergies: {', '.join(user_preferences.allergies)}")
     if getattr(user_preferences, 'preferred_cuisines', []):
-        preferences.append(f"Preferred Cuisines: {', '.join([c.value for c in user_preferences.preferred_cuisines])}")
+        preferences.append(f"Preferred Cuisines: {', '.join([c for c in user_preferences.preferred_cuisines])}")
     if getattr(user_preferences, 'restricted_cuisines', []):
-        preferences.append(f"Restricted Cuisines: {', '.join([c.value for c in user_preferences.restricted_cuisines])}")
+        preferences.append(f"Restricted Cuisines: {', '.join([c for c in user_preferences.restricted_cuisines])}")
     if getattr(user_preferences, 'preferred_meal_types', []):
         preferences.append(
             f"Preferred Meal Types: {', '.join([m.value for m in user_preferences.preferred_meal_types])}")
@@ -98,6 +98,7 @@ class AIGenerateMealPlan:
         current_date = datetime.fromisoformat(start_date)
         used_recipes = set()
         daily_plans = []
+        liked_recipe = []
         previous_day_recipes = {meal_type: None for meal_type in MealType}
 
         for day_offset in range(7):
@@ -108,13 +109,13 @@ class AIGenerateMealPlan:
                 try:
                     if url:
                         recipes = AIGenerateMealPlan._scrape_recipes(url)
-                        recipe =  AIGenerateMealPlan._get_unique_recipe(
+                        liked_recipe =  AIGenerateMealPlan._get_unique_recipe(
                             recipes, used_recipes, user_preferences, meal_type, preference_list
                         )
-                    else:
-                        previous_recipe = previous_day_recipes[meal_type] if day_offset > 0 else None
-                        recipe = await AIGenerateMealPlan._generate_unique_recipe(meal_type, preference_list, previous_recipe
-                        )
+
+                    previous_recipe = previous_day_recipes[meal_type] if day_offset > 0 else None
+                    recipe = await AIGenerateMealPlan._generate_unique_recipe(meal_type, preference_list,liked_recipe,previous_recipe
+                    )
                 except Exception as e:
                     print(f"Error generating recipe: {e}")
                     return {"error": "Error generating recipe"}
@@ -148,12 +149,15 @@ class AIGenerateMealPlan:
     async def _generate_unique_recipe(
             meal_type: MealType,
             preference_list: str,
+            liked_recipe: RecipeCreate,
             previous_recipe: Optional[RecipeCreate] = None
     ) -> RecipeCreate:
         context = ""
         if previous_recipe:
             context = f"Previous day's {meal_type.value}: {previous_recipe.title} with ingredients {', '.join(previous_recipe.ingredients)}. "
-
+        like = ""
+        if liked_recipe:
+            like = f"This recipe was favorable in the past, so make it unique, but similar to: {liked_recipe.title} with ingredients {', '.join(liked_recipe.ingredients)}. "
         prompt = (
             f"{context}Generate a unique {meal_type.value} recipe for today with different ingredients "
             f"based on the following user preferences:\n{preference_list}\n\n"
@@ -174,6 +178,7 @@ class AIGenerateMealPlan:
             '  "cook_time": 30,\n'
             '  "difficulty": 2\n'
             "}"
+            f"{like}"
         )
 
         messages = [ChatMessage(role="user", content=prompt)]
@@ -224,6 +229,8 @@ class AIGenerateMealPlan:
                 date_added=date.today(),
                 date_updated=date.today()
             )
+
+
 
     @staticmethod
     def _scrape_recipes(url: str):
