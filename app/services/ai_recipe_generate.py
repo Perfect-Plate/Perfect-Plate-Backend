@@ -108,7 +108,7 @@ class AIGenerateMealPlan:
                 try:
                     if url:
                         recipes = AIGenerateMealPlan._scrape_recipes(url)
-                        recipe = AIGenerateMealPlan._get_unique_recipe(
+                        recipe =  AIGenerateMealPlan._get_unique_recipe(
                             recipes, used_recipes, user_preferences, meal_type, preference_list
                         )
                     else:
@@ -235,7 +235,6 @@ class AIGenerateMealPlan:
             raise ValueError(f"Failed to retrieve the webpage, status code: {response.status_code}")
 
         soup = BeautifulSoup(response.text, 'html.parser')
-        current_time = datetime.now()
 
         # Get title, ingredients, description, and instructions
         title = scrape.getTitle(url)
@@ -268,12 +267,15 @@ class AIGenerateMealPlan:
 
     @staticmethod
     def _matches_preferences(recipe: RecipeCreate, user_preferences, meal_type: MealType) -> bool:
-        return (
-                recipe.meal_type == meal_type and
-                all(ingredient not in user_preferences.restricted_ingredients for ingredient in recipe.ingredients) and
-                (not recipe.cuisine or recipe.cuisine not in user_preferences.restricted_cuisines) and
-                meal_type not in user_preferences.restricted_meal_types
-        )
+        try:
+            return (
+                    recipe.meal_type == meal_type and
+                    all(ingredient not in user_preferences.restricted_ingredients for ingredient in recipe.ingredients) and
+                    (not recipe.cuisine or recipe.cuisine not in user_preferences.restricted_cuisines) and
+                    meal_type not in user_preferences.restricted_meal_types
+            )
+        except Exception as e:
+            return True
 
     @staticmethod
     async def get_meal_plan(user_id: str, meal_plan_id: str) -> Dict[str, Any]:
