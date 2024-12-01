@@ -43,6 +43,13 @@ class UserService:
         return user
 
     @staticmethod
+    async def get_user_signin(email: str, password: str):
+        user = await users_collection.find_one({"email": email, "password": password, "is_active": True, "is_deleted": False})
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        return user
+
+    @staticmethod
     async def update_user(user_id: str, user: UserCreate):
         user_data = convert_dates(user.dict())
         result = await users_collection.update_one({"uid": user_id}, {"$set": user_data})

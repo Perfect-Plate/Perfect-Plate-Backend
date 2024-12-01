@@ -49,8 +49,13 @@ class MealType(str, enum.Enum):
 class UserCreate(BaseModel):
     uid: str
     email: EmailStr
-    created_at: date
-    updated_at: date
+    first_name: str
+    last_name: str
+    username: str
+    age: int
+    password: str
+    created_at: date = date.today()
+    updated_at: date = date.today()
     is_active: bool = True
     is_deleted: bool = False
 
@@ -74,8 +79,8 @@ class UserPreferenceCreate(BaseModel):
     restricted_meal_types: List[MealType] = []
     preferred_ingredients: List[str] = []
     restricted_ingredients: List[str] = []
-    created_at: date
-    updated_at: date
+    created_at: date = date.today()
+    updated_at: date = date.today()
     is_active: bool = True
     is_deleted: bool = False
 
