@@ -19,6 +19,11 @@ async def create_user(user: UserCreate):
     return await UserService.create_user(user)
 
 
+@router.post("/signin/", response_model=UserCreate)
+async def user_signin(email: str, password: str):
+    return await UserService.get_user_signin(email, password)
+
+
 @router.get("/users/{user_id}/", response_model=UserCreate)
 async def get_user(user_id: str):
     return await UserService.get_user(user_id)
