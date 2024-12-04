@@ -15,7 +15,7 @@ from llama_index.core import Settings
 from types import SimpleNamespace
 
 from app.database.db_connect import meal_plans_collection, recipes_collection
-from app.models.models import WeeklyMealPlan, DailyMealPlan, MealType, RecipeCreate, CuisineType
+from app.models.models import WeeklyMealPlan, DailyMealPlan, MealType, RecipeCreate, CuisineType, MealPlanRequestInput
 from app.services.services import UserPreferenceService
 
 load_dotenv()
@@ -91,20 +91,33 @@ class AIGenerateMealPlan:
         return obj
 
     @staticmethod
-    async def generate_meal_plan(user_id: str, start_date: str, user_description: str,
-                                 url: Optional[str] = None) -> dict:
+    async def generate_meal_plan(input_data: MealPlanRequestInput) -> dict:
+        user_id = input_data.user_id
+        dates = input_data.dates
+        url = input_data.url
+        user_description = input_data.userDescription
+
+        # Fetch user preferences and prepare preference template
         user_preferences = await UserPreferenceService.get_preferences(user_id)
         preference_list = generate_preferences_template(user_preferences)
 
-        current_date = datetime.fromisoformat(start_date)
-        used_recipes = set()
-        daily_plans = []
-        previous_day_recipes = {meal_type: None for meal_type in MealType}
+        used_recipes = set()  # Keep track of used recipes to avoid repetition
+        daily_plans = []  # Store daily meal plans
+        previous_day_recipes = {meal_type: None for meal_type in MealType}  # Track recipes for each meal type
 
-        for day_offset in range(7):
-            day_date = current_date + timedelta(days=day_offset)
-            daily_recipes = []
+        print(dates)
 
+        # Loop through the provided dates
+        for date_str in dates:
+            try:
+                day_date = datetime.fromisoformat(date_str)  # Convert string to datetime
+            except ValueError as e:
+                print(f"Invalid date format: {date_str}. Error: {e}")
+                continue  # Skip invalid dates
+
+            daily_recipes = []  # Store recipes for the current day
+
+            # Generate recipes for each meal type
             for meal_type in MealType:
                 try:
                     if url:
@@ -113,37 +126,41 @@ class AIGenerateMealPlan:
                             recipes, used_recipes, user_preferences, meal_type, preference_list
                         )
                     else:
-                        previous_recipe = previous_day_recipes[meal_type] if day_offset > 0 else None
-                        recipe = await AIGenerateMealPlan._generate_unique_recipe(meal_type, preference_list,
-                                                                                  previous_recipe
-                                                                                  )
+                        previous_recipe = previous_day_recipes[meal_type]  # Get the recipe from the previous day
+                        recipe = await AIGenerateMealPlan._generate_unique_recipe(
+                            meal_type, preference_list, previous_recipe
+                        )
                 except Exception as e:
-                    print(f"Error generating recipe: {e}")
+                    print(f"Error generating recipe for {meal_type}: {e}")
                     return {"error": "Error generating recipe"}
 
-                daily_recipes.append(recipe)
-                used_recipes.add(recipe.title)
-                previous_day_recipes[meal_type] = recipe
+                daily_recipes.append(recipe)  # Add the recipe to the day's plan
+                used_recipes.add(recipe.title)  # Mark the recipe as used
+                previous_day_recipes[meal_type] = recipe  # Update the previous recipe for this meal type
 
+            # Create a daily meal plan
             daily_plan = DailyMealPlan(
                 date=day_date.date(),
                 recipes=daily_recipes
             )
-            daily_plans.append(daily_plan)
+            daily_plans.append(daily_plan)  # Append to the weekly plan
 
+        # Create a weekly meal plan object
         weekly_meal_plan = WeeklyMealPlan(
             user_id=user_id,
             meal_id=str(uuid.uuid4()),
-            meal_date=current_date.date(),
+            meal_date=datetime.now().date(),
             days=daily_plans,
             saved=False,
             created_at=datetime.now(),
             updated_at=datetime.now()
         )
 
+        # Prepare and save the meal plan to MongoDB
         meal_plan_dict = weekly_meal_plan.model_dump()
         prepared_dict = AIGenerateMealPlan._prepare_for_mongodb(meal_plan_dict)
         await meal_plans_collection.insert_one(prepared_dict)
+
         return meal_plan_dict
 
     @staticmethod

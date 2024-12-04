@@ -44,6 +44,10 @@ async def create_user_preferences(user_id: str, preferences: UserPreferenceCreat
     user = await UserService.get_user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    # check if user preferences already exist
+    # user_preferences = await UserPreferenceService.get_preferences(user_id)
+    # if user_preferences:
+    #     return await UserPreferenceService.update_preference(user_id, preferences)
     return await UserPreferenceService.create_preference(user_id, preferences)
 
 
