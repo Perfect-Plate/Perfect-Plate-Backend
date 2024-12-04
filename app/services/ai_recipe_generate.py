@@ -238,25 +238,27 @@ class AIGenerateMealPlan:
         HEADER = {"User-Agent": "Mozilla/5.0"}  # Prevents blocks on certain sites
         response = requests.get(url, headers=HEADER)
 
-        if response.status_code != 200:
-            raise ValueError(f"Failed to retrieve the webpage, status code: {response.status_code}")
+        try:
+            soup = BeautifulSoup(response.text, 'html.parser')
 
-        soup = BeautifulSoup(response.text, 'html.parser')
+            # Get title, ingredients, description, and instructions
+            title = scrape.getTitle(url)
+            ingredients = scrape.getIngredients(soup)
 
-        # Get title, ingredients, description, and instructions
-        title = scrape.getTitle(url)
-        ingredients = scrape.getIngredients(soup)
+            # Get description with fallback to default title-based description
+            description_tag = soup.find('p', class_='description')
+            description = description_tag.text.strip() if description_tag else f"A delicious {title}"
 
-        # Get description with fallback to default title-based description
-        description_tag = soup.find('p', class_='description')
-        description = description_tag.text.strip() if description_tag else f"A delicious {title}"
-
-
-        instructions = scrape.getInstructions(soup)
-        if not instructions:
-            instructions = ["No Instructions Found."]
-        print(ingredients)
-        print(instructions)
+            instructions = scrape.getInstructions(soup)
+            if not instructions:
+                instructions = ["No Instructions Found."]
+            print("Scraping recipe")
+        except Exception as e:
+            print("Error Scraping. Fallback method:")
+            title = scrape.getTitle(url)
+            ingredients = f"Standard ingredients for {title}"
+            description = f"A delicious {title}"
+            instructions = f"Standard instructions for {title}"
 
         # Create the recipe dictionary
         full_recipe = {
@@ -265,10 +267,6 @@ class AIGenerateMealPlan:
             "ingredients": ingredients,
             "instructions": instructions
         }
-        print(full_recipe)
-
-        # Debugging: Check full_recipe structure
-        print(f"Full recipe dictionary (before returning): {full_recipe}")
 
         return full_recipe
 
