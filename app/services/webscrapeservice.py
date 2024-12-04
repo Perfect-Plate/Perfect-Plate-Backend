@@ -18,6 +18,18 @@ class WebScrapeService:
 
     def getTitle(self, link: str):
         """Extracts a title from the URL based on its structure."""
+        # Regex pattern for matching a website URL
+        pattern = re.compile(
+            r'^(https?:\/\/)?'  # Match the protocol (optional)
+            r'(([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,6})'  # Match the domain name
+            r'(\/[a-zA-Z0-9-._~:?#@!$&\'()*+,;=%]*)?$'  # Match the path or query parameters (optional)
+        )
+
+        # Example usage
+        url = "https://example.com/path?query=123"
+        match = pattern.match(url)
+        if not match:
+            return "Error"
         linksplit = link.split('/')
         filtered = []
 
@@ -75,9 +87,6 @@ class WebScrapeService:
         recipe = re.sub(r'(?<=\d)(?=[a-zA-Z])', ' ', recipe)
         recipe = re.sub(r'(?<=[a-zA-Z])(?=\d)', ' ', recipe)
         recipe = re.sub(r'(?<!\s)(?=[¼½¾⅛⅜⅝⅞])', ' ', recipe)
-
-        # Debugging - print ingredients to check format
-        print(f"Ingredients (after cleanup): {recipe}")
 
         ingredients = recipe.split(" ")
 

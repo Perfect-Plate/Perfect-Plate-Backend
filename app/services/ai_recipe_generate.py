@@ -235,14 +235,17 @@ class AIGenerateMealPlan:
     @staticmethod
     def _scrape_recipes(url: str):
         scrape = WebScrapeService()
+        title = scrape.getTitle(url)
+        if title == "Error":
+            raise ValueError("Error: Not a URL")
+
         HEADER = {"User-Agent": "Mozilla/5.0"}  # Prevents blocks on certain sites
         response = requests.get(url, headers=HEADER)
 
-        try:
+        if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
+            # Get ingredients, description, and instructions
 
-            # Get title, ingredients, description, and instructions
-            title = scrape.getTitle(url)
             ingredients = scrape.getIngredients(soup)
 
             # Get description with fallback to default title-based description
@@ -253,9 +256,8 @@ class AIGenerateMealPlan:
             if not instructions:
                 instructions = ["No Instructions Found."]
             print("Scraping recipe")
-        except Exception as e:
+        else:
             print("Error Scraping. Fallback method:")
-            title = scrape.getTitle(url)
             ingredients = f"Standard ingredients for {title}"
             description = f"A delicious {title}"
             instructions = f"Standard instructions for {title}"

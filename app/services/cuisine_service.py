@@ -7,12 +7,17 @@ from app.services.services import convert_dates
 
 class CuisinePreferenceService:
     @staticmethod
-    async def create_cuisine_preference(user_id: str, preference: CuisinePreference):
+    async def create_cuisine_preference(user_id: str, preference: CuisinePreference) -> dict:
         preference_data = convert_dates(preference.dict())
         preference_data["user_id"] = user_id
         result = await preferences_collection.insert_one(preference_data)
+
         if not result.inserted_id:
             raise HTTPException(status_code=500, detail="Failed to create cuisine preference")
+
+        # Convert the inserted_id (ObjectId) to a string
+        preference_data["_id"] = str(result.inserted_id)
+
         return preference_data
 
     @staticmethod
