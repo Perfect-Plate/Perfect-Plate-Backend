@@ -8,7 +8,7 @@ from fastapi import APIRouter
 from pydantic import ValidationError
 
 from app.database.db_connect import meal_plans_collection
-from app.models.models import WeeklyMealPlan, RecipeCreate, PyObjectId, MealType
+from app.models.models import WeeklyMealPlan, RecipeCreate, PyObjectId, MealType, MealPlanRequestInput
 from app.services.ai_recipe_generate import AIGenerateMealPlan
 from app.services.services import UserService
 
@@ -30,7 +30,7 @@ async def root():
     return {"message": "Project start"}
 
 
-@openapi.get("ai/get_meal_plan/", response_model=dict)
+@openapi.get("/get_meal_plan/", response_model=dict)
 async def get_meal_plan(user_id: str, meal_plan_id: str):
     user = await UserService.get_user(user_id)
     if not user:
@@ -39,12 +39,12 @@ async def get_meal_plan(user_id: str, meal_plan_id: str):
     return serialize_meal(meal_plan)
 
 
-@openapi.post("/ai/create_meal_plan/", response_model=dict)
-async def generate_meal_plan(user_id: str, start_date: str, user_description: str, url: Optional[str] = ""):
-    user = await UserService.get_user(user_id)
+@openapi.post("/create_meal_plan/", response_model=dict)
+async def generate_meal_plan(input_data: MealPlanRequestInput):
+    user = await UserService.get_user(input_data.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    meal_plan = await AIGenerateMealPlan.generate_meal_plan(user_id, start_date, user_description, url)
+    meal_plan = await AIGenerateMealPlan.generate_meal_plan(input_data)
     return serialize_meal(meal_plan)
 
 
@@ -101,7 +101,7 @@ async def generate_meal_plan(user_id: str, start_date: str, user_description: st
 #         raise HTTPException(e)
 
 
-@openapi.delete("/ai/delete_meal_plan/", response_model=dict)
+@openapi.delete("/delete_meal_plan/", response_model=dict)
 async def delete_meal_plan(user_id: str, meal_id: str):
     user = await UserService.get_user(user_id)
     if not user:
@@ -112,7 +112,7 @@ async def delete_meal_plan(user_id: str, meal_id: str):
     return {"detail": "Meal plan deleted successfully"}
 
 
-@openapi.post("/ai/generate_recipe/", response_model=dict)
+@openapi.post("/generate_recipe/", response_model=dict)
 async def generate_recipe(user_id: str, user_description: str, meal_type: MealType, url: Optional[str] = ""):
     user = await UserService.get_user(user_id)
     if not user:
@@ -121,7 +121,7 @@ async def generate_recipe(user_id: str, user_description: str, meal_type: MealTy
     return serialize_meal(recipe)
 
 
-@openapi.post("/ai/regenerate_recipe/", response_model=dict)
+@openapi.post("/regenerate_recipe/", response_model=dict)
 async def regenerate_recipe(user_id: str, recipe_id: str, meal_type: MealType, meal_plan_id: Optional[str] = ""):
     user = await UserService.get_user(user_id)
     if not user:

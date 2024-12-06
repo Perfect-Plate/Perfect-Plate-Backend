@@ -45,6 +45,14 @@ class MealType(str, enum.Enum):
     DINNER = "Dinner"
 
 
+class MealPlanRequestInput(BaseModel):
+    user_id: str
+    dates: List[str]
+    userDescription: str
+    url: Optional[str] = None
+
+
+
 # Pydantic Models
 class UserCreate(BaseModel):
     uid: str
