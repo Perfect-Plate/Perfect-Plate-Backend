@@ -121,10 +121,11 @@ class AIGenerateMealPlan:
             for meal_type in MealType:
                 try:
                     if url:
-                        recipes = AIGenerateMealPlan._scrape_recipes(url)
-                        recipe = AIGenerateMealPlan._get_unique_recipe(
-                            recipes, used_recipes, user_preferences, meal_type, preference_list
-                        )
+                        recipes = await AIGenerateMealPlan._scrape_recipes(url)
+                        print(recipes)
+                        recipe = await AIGenerateMealPlan._get_unique_recipe(recipes, set(), user_preferences,
+                                                                             meal_type, preference_list,
+                                                                             user_description, True)
                     else:
                         previous_recipe = previous_day_recipes[meal_type]  # Get the recipe from the previous day
                         recipe = await AIGenerateMealPlan._generate_unique_recipe(
@@ -273,7 +274,7 @@ class AIGenerateMealPlan:
             )
 
     @staticmethod
-    def _scrape_recipes(url: str):
+    async def _scrape_recipes(url: str):
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
         recipes = soup.find_all('div', class_='recipe')
@@ -300,7 +301,8 @@ class AIGenerateMealPlan:
         return meal_plan
 
     @classmethod
-    def _get_unique_recipe(cls, recipes, used_recipes, user_preferences, meal_type, preference_list, user_description="", is_sigle=False):
+    def _get_unique_recipe(cls, recipes, used_recipes, user_preferences, meal_type, preference_list,
+                           user_description="", is_sigle=False):
         for recipe in recipes:
             if recipe['title'] not in used_recipes:
                 recipe_create = RecipeCreate(
@@ -416,8 +418,10 @@ class AIGenerateMealPlan:
 
         try:
             if url:
-                recipes = cls._scrape_recipes(url)
-                recipe = cls._get_unique_recipe(recipes, set(), user_preferences, meal_type, preference_list, user_description, True)
+                recipes = await cls._scrape_recipes(url)
+                print(recipes)
+                recipe = cls._get_unique_recipe(recipes, set(), user_preferences, meal_type, preference_list,
+                                                user_description, True)
                 recipe = AIGenerateMealPlan._prepare_for_mongodb(recipe.dict())
                 recipe = await recipes_collection.insert_one(recipe)
                 return recipe
