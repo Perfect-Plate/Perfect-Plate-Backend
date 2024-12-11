@@ -43,11 +43,12 @@ class MealType(str, enum.Enum):
     BREAKFAST = "Breakfast"
     LUNCH = "Lunch"
     DINNER = "Dinner"
+    Empty = ""
 
 
 class MealPlanRequestInput(BaseModel):
     user_id: str
-    dates: List[str]
+    dates: Optional[List[str]]
     userDescription: str
     url: Optional[str] = None
 
