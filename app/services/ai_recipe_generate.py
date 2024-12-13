@@ -1,8 +1,9 @@
+import re
 from datetime import datetime, timedelta, date
 from http.client import HTTPException
 import os
 import uuid
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from bson import ObjectId
 import requests
 from bs4 import BeautifulSoup
@@ -17,6 +18,7 @@ from types import SimpleNamespace
 from app.database.db_connect import meal_plans_collection, recipes_collection
 from app.models.models import WeeklyMealPlan, DailyMealPlan, MealType, RecipeCreate, CuisineType, MealPlanRequestInput
 from app.services.services import UserPreferenceService
+from app.services.webscrapeservice import WebScrapeService
 
 load_dotenv()
 
@@ -25,7 +27,6 @@ openai_api_key = os.getenv("OPENAI_API_KEY")
 llm = OpenAI(model="gpt-4")
 embed_model = OpenAIEmbedding(model="text-embedding-3-small")
 Settings.llm = llm
-llm.temperature = 0.9
 llm.api_key = openai_api_key
 Settings.embed_model = embed_model
 
@@ -50,17 +51,15 @@ def generate_preferences_template(user_preferences):
     if getattr(user_preferences, 'allergies', []):
         preferences.append(f"Allergies: {', '.join(user_preferences.allergies)}")
     if getattr(user_preferences, 'preferred_cuisines', []):
-        # Assuming preferred_cuisines is a list of strings
-        preferences.append(f"Preferred Cuisines: {', '.join(user_preferences.preferred_cuisines)}")
+        preferences.append(f"Preferred Cuisines: {', '.join([c for c in user_preferences.preferred_cuisines])}")
     if getattr(user_preferences, 'restricted_cuisines', []):
-        # Assuming restricted_cuisines is a list of strings
-        preferences.append(f"Restricted Cuisines: {', '.join(user_preferences.restricted_cuisines)}")
+        preferences.append(f"Restricted Cuisines: {', '.join([c for c in user_preferences.restricted_cuisines])}")
     if getattr(user_preferences, 'preferred_meal_types', []):
-        # Assuming preferred_meal_types is a list of strings
-        preferences.append(f"Preferred Meal Types: {', '.join(user_preferences.preferred_meal_types)}")
+        preferences.append(
+            f"Preferred Meal Types: {', '.join([m.value for m in user_preferences.preferred_meal_types])}")
     if getattr(user_preferences, 'restricted_meal_types', []):
-        # Assuming restricted_meal_types is a list of strings
-        preferences.append(f"Restricted Meal Types: {', '.join(user_preferences.restricted_meal_types)}")
+        preferences.append(
+            f"Restricted Meal Types: {', '.join([m.value for m in user_preferences.restricted_meal_types])}")
     if getattr(user_preferences, 'preferred_ingredients', []):
         preferences.append(f"Preferred Ingredients: {', '.join(user_preferences.preferred_ingredients)}")
     if getattr(user_preferences, 'restricted_ingredients', []):
@@ -101,6 +100,8 @@ class AIGenerateMealPlan:
         user_preferences = await UserPreferenceService.get_preferences(user_id)
         preference_list = generate_preferences_template(user_preferences)
 
+        liked_recipe = []
+        previous_day_recipes = {meal_type: None for meal_type in MealType}
         used_recipes = set()  # Keep track of used recipes to avoid repetition
         daily_plans = []  # Store daily meal plans
         previous_day_recipes = {meal_type: None for meal_type in MealType}  # Track recipes for each meal type
@@ -168,61 +169,37 @@ class AIGenerateMealPlan:
     async def _generate_unique_recipe(
             meal_type: MealType,
             preference_list: str,
-            previous_recipe: Optional[RecipeCreate] = None,
-            user_description: str = "",
-            is_single: bool = False
+            liked_recipe: RecipeCreate,
+            previous_recipe: Optional[RecipeCreate] = None
     ) -> RecipeCreate:
         context = ""
-
-        if is_single:
-            prompt = (
-                f"Generate a unique recipe for today with different ingredients "
-                f"and user description:\n{user_description}\n\n"
-                f"based on the following user preferences:\n{preference_list}\n\n"
-                f"Response should be a JSON object with the following structure:\n"
-                "{\n"
-                '  "title": "Recipe Title",\n'
-                '  "description": "A description of the recipe",\n'
-                '  "ingredients": ["ingredient 1", "ingredient 2", ...],\n'
-                '  "instructions": ["step 1", "step 2", ...],\n'
-                '  "cuisine": "Mexican|Italian|Chinese|American|Indian|Thai|Japanese",\n'
-                '  "calories": 500,\n'
-                '  "protein": 30,\n'
-                '  "fat": 20,\n'
-                '  "sodium": 500,\n'
-                '  "carb": 40,\n'
-                '  "servings": 4,\n'
-                '  "prep_time": 15,\n'
-                '  "cook_time": 30,\n'
-                '  "difficulty": 2\n'
-                "}"
-            )
-        else:
-            if previous_recipe:
-                context = f"Previous day's {meal_type.value}: {previous_recipe.title} with ingredients {', '.join(previous_recipe.ingredients)}. "
-
-            prompt = (
-                f"{context}Generate a unique {meal_type.value} recipe for today with different ingredients "
-                f"and user description:\n{user_description}\n\n"
-                f"based on the following user preferences:\n{preference_list}\n\n"
-                f"Response should be a JSON object with the following structure:\n"
-                "{\n"
-                '  "title": "Recipe Title",\n'
-                '  "description": "A description of the recipe",\n'
-                '  "ingredients": ["ingredient 1", "ingredient 2", ...],\n'
-                '  "instructions": ["step 1", "step 2", ...],\n'
-                '  "cuisine": "Mexican|Italian|Chinese|American|Indian|Thai|Japanese",\n'
-                '  "calories": 500,\n'
-                '  "protein": 30,\n'
-                '  "fat": 20,\n'
-                '  "sodium": 500,\n'
-                '  "carb": 40,\n'
-                '  "servings": 4,\n'
-                '  "prep_time": 15,\n'
-                '  "cook_time": 30,\n'
-                '  "difficulty": 2\n'
-                "}"
-            )
+        if previous_recipe:
+            context = f"Previous day's {meal_type.value}: {previous_recipe.title} with ingredients {', '.join(previous_recipe.ingredients)}. "
+        like = ""
+        if liked_recipe:
+            like = f"This recipe was favorable in the past, so make it unique, but similar to: {liked_recipe.title} with ingredients {', '.join(liked_recipe.ingredients)}. "
+        prompt = (
+            f"{context}Generate a unique {meal_type.value} recipe for today with different ingredients "
+            f"based on the following user preferences:\n{preference_list}\n\n"
+            f"Response should be a JSON object with the following structure:\n"
+            "{\n"
+            '  "title": "Recipe Title",\n'
+            '  "description": "A description of the recipe",\n'
+            '  "ingredients": ["ingredient 1", "ingredient 2", ...],\n'
+            '  "instructions": ["step 1", "step 2", ...],\n'
+            '  "cuisine": "Mexican|Italian|Chinese|American|Indian|Thai|Japanese",\n'
+            '  "calories": 500,\n'
+            '  "protein": 30,\n'
+            '  "fat": 20,\n'
+            '  "sodium": 500,\n'
+            '  "carb": 40,\n'
+            '  "servings": 4,\n'
+            '  "prep_time": 15,\n'
+            '  "cook_time": 30,\n'
+            '  "difficulty": 2\n'
+            "}"
+            f"{like}"
+        )
 
         messages = [ChatMessage(role="user", content=prompt)]
         response = await llm.achat(messages)
@@ -273,25 +250,59 @@ class AIGenerateMealPlan:
                 date_updated=date.today()
             )
 
+
+
     @staticmethod
     async def _scrape_recipes(url: str):
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        recipes = soup.find_all('div', class_='recipe')
-        return [{
-            "title": recipe.find('h2').text,
-            "ingredients": [i.text for i in recipe.find('ul').find_all('li')],
-            "instructions": [i.text for i in recipe.find('ol').find_all('li')]
-        } for recipe in recipes]
+        scrape = WebScrapeService()
+        title = scrape.getTitle(url)
+        if title == "Error":
+            raise ValueError("Error: Not a URL")
+
+        HEADER = {"User-Agent": "Mozilla/5.0"}  # Prevents blocks on certain sites
+        response = requests.get(url, headers=HEADER)
+
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            # Get ingredients, description, and instructions
+
+            ingredients = scrape.getIngredients(soup)
+
+            # Get description with fallback to default title-based description
+            description_tag = soup.find('p', class_='description')
+            description = description_tag.text.strip() if description_tag else f"A delicious {title}"
+
+            instructions = scrape.getInstructions(soup)
+            if not instructions:
+                instructions = ["No Instructions Found."]
+            print("Scraping recipe")
+        else:
+            print("Error Scraping. Fallback method:")
+            ingredients = f"Standard ingredients for {title}"
+            description = f"A delicious {title}"
+            instructions = f"Standard instructions for {title}"
+
+        # Create the recipe dictionary
+        full_recipe = {
+            "title": title,
+            "description": description,
+            "ingredients": ingredients,
+            "instructions": instructions
+        }
+
+        return full_recipe
 
     @staticmethod
     def _matches_preferences(recipe: RecipeCreate, user_preferences, meal_type: MealType) -> bool:
-        return (
-                recipe.meal_type == meal_type and
-                all(ingredient not in user_preferences.restricted_ingredients for ingredient in recipe.ingredients) and
-                (not recipe.cuisine or recipe.cuisine not in user_preferences.restricted_cuisines) and
-                meal_type not in user_preferences.restricted_meal_types
-        )
+        try:
+            return (
+                    recipe.meal_type == meal_type and
+                    all(ingredient not in user_preferences.restricted_ingredients for ingredient in recipe.ingredients) and
+                    (not recipe.cuisine or recipe.cuisine not in user_preferences.restricted_cuisines) and
+                    meal_type not in user_preferences.restricted_meal_types
+            )
+        except Exception as e:
+            return True
 
     @staticmethod
     async def get_meal_plan(user_id: str, meal_plan_id: str) -> Dict[str, Any]:
@@ -304,12 +315,33 @@ class AIGenerateMealPlan:
     def _get_unique_recipe(cls, recipes, used_recipes, user_preferences, meal_type, preference_list,
                            user_description="", is_sigle=False):
         for recipe in recipes:
-            if recipe['title'] not in used_recipes:
+            if recipe[0] not in used_recipes:
+                title = recipe[0]
+                title = "".join(title)
+                description = recipe[1]
+                description = "".join(description)
+                ingredients = recipe[2]
+                instructions = recipe[3].split(".")
+                ingredient_pattern = re.compile(r'(\d+\s?\d*\/\d+|\d+\s?\d+\s?)([a-zA-Z]+[\w\s]*)')
+                ingredient_lines = ingredients.split('  ')
+                processed_ingredients = []
+                for line in ingredient_lines:
+                    line = line.strip()
+                    if line:  # Skip empty lines
+                        match = re.match(ingredient_pattern, line)
+                        if match:
+                            quantity = match.group(1).strip()
+                            ingredient_name = match.group(2).strip()
+                            processed_ingredients.append(f"{quantity} {ingredient_name}")
+                        else:
+                            processed_ingredients.append(line)  # If no match, append the line as is
+                ingredients = processed_ingredients
+
                 recipe_create = RecipeCreate(
-                    title=recipe['title'],
-                    description=f"A delicious {recipe['title']} recipe",  # Added description
-                    ingredients=recipe['ingredients'],
-                    instructions=recipe['instructions'],
+                    title=title,
+                    description=description,
+                    ingredients=ingredients,
+                    instructions=instructions,
                     meal_type=meal_type,
                     cuisine=CuisineType.AMERICAN,  # Default cuisine
                     calories=0,
@@ -327,7 +359,7 @@ class AIGenerateMealPlan:
                 )
                 if cls._matches_preferences(recipe_create, user_preferences, meal_type):
                     return recipe_create
-        return cls._generate_unique_recipe(meal_type, preference_list, None, user_description, is_sigle)
+        return cls._generate_unique_recipe(meal_type, preference_list, None)
 
     @staticmethod
     async def update_recipe_in_meal_plan(
