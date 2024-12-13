@@ -432,7 +432,7 @@ class AIGenerateMealPlan:
             raise HTTPException(status_code=500, detail=f"Error updating recipe: {str(e)}")
 
     @classmethod
-    async def generate_recipe(cls, user_id, user_description, meal_type, url):
+    async def generate_recipe(cls, input_data: MealPlanRequestInput) -> Dict[str, Any]:
         """
         Generate a recipe based on user preferences and a user description.
 
@@ -443,8 +443,13 @@ class AIGenerateMealPlan:
 
         Returns:
             Dict containing the generated recipe data or an error message
-            :param meal_type:
+            :param input_data:
         """
+        user_id = input_data.user_id
+        # dates = input_data.dates
+        url = input_data.url
+        user_description = input_data.userDescription
+
         user_preferences = await UserPreferenceService.get_preferences(user_id)
         preference_list = generate_preferences_template(user_preferences)
 
@@ -452,22 +457,22 @@ class AIGenerateMealPlan:
             if url:
                 recipes = await cls._scrape_recipes(url)
                 print(recipes)
-                recipe = cls._get_unique_recipe(recipes, set(), user_preferences, meal_type, preference_list,
+                recipe = cls._get_unique_recipe(recipes, set(), user_preferences, "", preference_list,
                                                 user_description, True)
                 recipe = AIGenerateMealPlan._prepare_for_mongodb(recipe.dict())
                 recipe = await recipes_collection.insert_one(recipe)
                 return recipe
             else:
-                recipe = await cls._generate_unique_recipe(meal_type, preference_list, None)
-                recipe = AIGenerateMealPlan._prepare_for_mongodb(recipe.dict())
-                recipe = await recipes_collection.insert_one(recipe)
-                return recipe
+                recipe = await cls._generate_unique_recipe(MealType.Empty, preference_list, None, user_description, True)
+                recipe_dict = AIGenerateMealPlan._prepare_for_mongodb(recipe.dict())
+                await recipes_collection.insert_one(recipe_dict)
+                return recipe_dict
 
         except Exception as e:
             return {"error": str(e)}
 
     @classmethod
-    async def regenerate_recipe(cls, user_id: str, recipe_id: str, meal_type: MealType,
+    async def regenerate_recipe(cls, user_id: str, recipe_id: str,
                                 meal_plan_id: Optional[str]) -> RecipeCreate:
         """
         Regenerate a single recipe within a meal plan.
@@ -491,7 +496,7 @@ class AIGenerateMealPlan:
         preference_list = generate_preferences_template(user_preferences)
 
         # Regenerate the recipe
-        regenerated_recipe = await cls._generate_unique_recipe(meal_type, preference_list, None)
+        regenerated_recipe = await cls._generate_unique_recipe("", preference_list, None, "", True)
 
         # return regenerated_recipe
 
